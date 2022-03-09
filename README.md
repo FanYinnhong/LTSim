@@ -9,5 +9,5 @@ The LTSim have little renders for the convenience of traffic research.
 
 ### v0.1 2022-03-09
 
-- load map from XML files according to (ASAM OpenDRIVE®)[https://www.asam.net/standards/detail/opendrive/]
+- load map from XML files according to [ASAM OpenDRIVE®](https://www.asam.net/standards/detail/opendrive/).
 
