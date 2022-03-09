@@ -1,1 +1,1 @@
-from parser import parse_opendrive
+from .parser import parse_opendrive
