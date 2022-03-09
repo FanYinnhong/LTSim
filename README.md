@@ -7,7 +7,8 @@ The LTSim have little renders for the convenience of traffic research.
 
 ## Versions
 
-### v0.1 2022-03-09
+### V0.1 2022-03-09
 
-- load map from XML files according to [ASAM OpenDRIVE®](https://www.asam.net/standards/detail/opendrive/).
+- Load map from XML files according to [ASAM OpenDRIVE®](https://www.asam.net/standards/detail/opendrive/).
+- Generate vehicles randomly and let them run in the road network.
 
