@@ -2,8 +2,9 @@
 
 ## Objectives
 
-Develop a light simulation platform for traffic research.
-The LTSim have little renders for the convenience of traffic research.
+Develop a simulation platform for traffic research. 
+
+The LTSim have light renders for the convenience of traffic research.
 
 ## Versions
 
