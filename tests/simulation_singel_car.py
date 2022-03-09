@@ -2,6 +2,8 @@ import hashlib
 import math
 import os
 import random
+import sys
+sys.path.append('..')
 
 from lxml import etree
 from io import StringIO, BytesIO
@@ -238,37 +240,23 @@ class MapImage(object):
                 elif connectingRoad.link.successor.elementId != incomingRoad_id:
                     connection.leavingRoad = connectingRoad.link.successor.elementId
                     connection.contactPointOnLeavingRoad = connectingRoad.link.successor.contactPoint
-                # for road in self._roads:
-                #     if (road.link.successor.elementId == connectingRoad_id):
-                #         print("1")
-                #     if (road.link.predecessor.elementId == connectingRoad_id and road.id != incomingRoad_id):
-                #         connection.leavingRoad = road.id
-                #         connection.contactPointOnLeavingRoad = "start"
-                #     if (road.link.successor.elementId == connectingRoad_id and road.id != incomingRoad_id):
-                #         connection.leavingRoad = road.id
-                #         connection.contactPointOnLeavingRoad = "end"
-
-                # geometry = self._roads[self._road_id_to_index].planView.geometries[0]
-                # geometry.getLength()
-                # if connection.contactPoint == "start":
-                #     pos_start, _ = geometry.calcPosition(0)
-                #     pos_end,   _ = geometry.calcPosition(geometry.getLength())
-                # else:
-                #     pos_start, _ = geometry.calcPosition(geometry.getLength())
-                #     pos_end,   _ = geometry.calcPosition(0)
-                #
-                # connectingRoad = self._roads[self._road_id_to_index[connectingRoad_id]]
-                # connectingRoad_start, _ = connectingRoad.planView.geometries[0].calcPosition(0)
-                # distance_from_connectingRoad_start = pow((pos_start[0] - connectingRoad_start[0]), 2) \
-                #                                      + pow((pos_start[1] - connectingRoad_start[1]), 2)
-                # distance_from_connectingRoad_end = pow((pos_end[0] - connectingRoad_start[0]), 2) \
-                #                                      + pow((pos_end[1] - connectingRoad_start[1]), 2)
 
     def get_all_start_points(self):
         for road in self._roads:
             geometries = road.planView.geometries
             for geometry in geometries:
                 self._all_start_points.append(geometry.getStartPosition())
+
+
+class Map(object):
+    def __init__(self,roads, junctions, index1, index2,index3, width):
+        self.roads = roads
+        self.junctions = junctions
+        self._road_id_to_index = index1
+        self._junction_id_to_index = index2
+        self._road_id_to_junction_index = index3
+        self._world_width = width
+        
 
 class Vehicle(pygame.sprite.Sprite):
 
@@ -468,14 +456,6 @@ class Vehicle(pygame.sprite.Sprite):
                                                     (int(self.pixels_per_meter * 5),
                                                      int(self.pixels_per_meter * 2)))
 
-class Map(object):
-    def __init__(self,roads, junctions, index1, index2,index3, width):
-        self.roads = roads
-        self.junctions = junctions
-        self._road_id_to_index = index1
-        self._junction_id_to_index = index2
-        self._road_id_to_junction_index = index3
-        self._world_width = width
 
 class World(object):
     """Class that contains all the information of simulation that is running on the server side"""
@@ -486,19 +466,6 @@ class World(object):
         # World data
         self.world = None
         self.vehicle_simulation = vehicle_simulation
-
-        # Hero actor
-        self.hero_actor = None
-        self.spawned_hero = None
-        self.hero_transform = None
-
-        self.scale_offset = [0, 0]
-
-        self.vehicle_id_surface = None
-        self.result_surface = None
-
-        # self.traffic_light_surfaces = TrafficLightSurfaces()
-        self.affected_traffic_light = None
 
         # Map info
         self.map_image = None
