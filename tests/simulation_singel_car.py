@@ -1,8 +1,14 @@
 import hashlib
 import math
 import os
+from pickle import TRUE
 import random
-import sys
+import sys, pdb
+import copy
+from scipy import rand
+
+from sympy import false
+
 sys.path.append('..')
 
 from lxml import etree
@@ -51,6 +57,13 @@ COLOR_ALUMINIUM_3 = pygame.Color(136, 138, 133)
 COLOR_ALUMINIUM_4 = pygame.Color(85, 87, 83)
 COLOR_ALUMINIUM_4_5 = pygame.Color(66, 62, 64)
 COLOR_ALUMINIUM_5 = pygame.Color(46, 52, 54)
+
+
+COLOR_GREEN_CAR = pygame.Color(139, 209, 81)
+COLOR_YELLOW_CAR = pygame.Color(255, 243, 0)
+COLOR_RED_CAR = pygame.Color(239, 41, 41)
+
+car_color_set = [COLOR_RED_CAR, COLOR_YELLOW_CAR, COLOR_GREEN_CAR]
 
 COLOR_WHITE = pygame.Color(255, 255, 255)
 COLOR_BLACK = pygame.Color(0, 0, 0)
@@ -258,30 +271,36 @@ class Map(object):
         self._world_width = width
         
 
-class Vehicle(pygame.sprite.Sprite):
+class Vehicle():
 
     def __init__(self, vehicle_class, road_id, direction, lane, pos_frenet, map, simulation, pixels_per_meter, world_offset):
-        pygame.sprite.Sprite.__init__(self)
+        self.map = map
+        self.leftVector = Vector3D()
+        self.pixels_per_meter = pixels_per_meter
+        self.world_offset = world_offset
+
+        self.vehicle_l = int(self.pixels_per_meter * 3)
+        self.vehicle_w = int(self.pixels_per_meter * 1)
+        self.shape = []
+        
         self.road_id = road_id
         self.lane = lane
         # 1 means the left lane in current road, 0 means the right lane in current road
         self.direction = direction
         self.vehicle_class = vehicle_class
-        self.speed = 5
+        self.speed = 2
         self.pos_frenet = pos_frenet
-        self.map = map
-        self.leftVector = Vector3D()
-        self.pixels_per_meter = pixels_per_meter
-        self.world_offset = world_offset
+        self.hdg = 0
         self.x = 0
         self.y = 0
-        self.original_image = self.load_vehicle_image()
-        self.image = self.load_vehicle_image()
         self.rotation_degree = 0
+        self.x_in_pixel, self.y_in_pixel = -1, -1
+        self.last_in_pixel = [0,0]
         self.get_position()
         simulation.add(self)
 
-    def move(self):
+    def move(self, speed):
+        self.speed = speed
         # check whether vehicle is in road or junctions
         road = self.map.roads[self.map._road_id_to_index[self.road_id]]
         is_junction = False if road.junction == None else True
@@ -404,12 +423,18 @@ class Vehicle(pygame.sprite.Sprite):
                             self.lane = 1
                         else:
 
-                            self.pos_frenet = self.map.roads[self.map._road_id_to_index[road.link.predecessor.elementId]].length\
-                                              - pos_frenet_temp
+                            self.pos_frenet = self.map.roads[self.map._road_id_to_index[road.link.predecessor.elementId]].length - pos_frenet_temp
                             self.direction = 1
                             self.lane = 1
                         self.road_id = road.link.predecessor.elementId
         self.get_position()
+
+    def record(self):
+        return [self.road_id,self.lane,self.pos_frenet,self.direction][:]
+
+    def back2record(self, record_state):
+        [self.road_id,self.lane,self.pos_frenet,self.direction] = record_state
+        
 
     def get_position(self):
         s_pos = self.pos_frenet
@@ -422,39 +447,67 @@ class Vehicle(pygame.sprite.Sprite):
             else:
                 pos, hdg = geometry.calcPosition(s_pos)
                 break
-
+        self.hdg = hdg
         self.x, self.y = pos[0], pos[1]
         # Returns the lateral vector based on forward vector
         self.leftVector.x, self.leftVector.y = np.cos(hdg), np.sin(hdg)
-        self.leftVector.rotation2D(-np.pi / 2)
+        self.leftVector.rotation2D(np.pi / 2)
 
 
         if self.direction > 0:
             self.x, self.y = pos[0] - self.leftVector.x * self.lane * 2, pos[1] - self.leftVector.y * self.lane * 2
-            self.rotation_degree = math.degrees(np.pi + hdg)
+            self.rotation_degree = math.degrees(np.pi + hdg) % 360
         else:
             self.x, self.y = pos[0] + self.leftVector.x * self.lane * 2, pos[1] + self.leftVector.y * self.lane * 2
-            self.rotation_degree = math.degrees(hdg)
-        # it gets the image to rotate
-        self.image = pygame.transform.rotate(self.original_image, self.rotation_degree)
+            self.rotation_degree = math.degrees(hdg) % 360
+
         # get position in pixel
+        if self.last_in_pixel[0] != self.x_in_pixel and self.last_in_pixel[1] != self.y_in_pixel:
+            self.last_in_pixel = [self.x_in_pixel, self.y_in_pixel]
         self.x_in_pixel, self.y_in_pixel = self.pos_in_pixel()
+        
 
     def pos_in_pixel(self):
         x = self.pixels_per_meter * (self.x - self.world_offset[0])
         y = self.pixels_per_meter * (self.map._world_width - (self.y - self.world_offset[1]))
         return [int(x), int(y)]
 
-    def load_vehicle_image(self):
-        _ME_PATH = os.path.abspath(os.path.dirname(__file__))
-        IMAGE_PATH = os.path.normpath(os.path.join(_ME_PATH, '../data/image'))
-        imagename = "car.png"
-        imagepath = os.path.join(IMAGE_PATH, imagename)
-        original_image = pygame.image.load(imagepath)
-        # Assuming the size of vehicle is 5.4m * 2.2m
-        return pygame.transform.scale(original_image,
-                                                    (int(self.pixels_per_meter * 5),
-                                                     int(self.pixels_per_meter * 2)))
+
+    def get_shape_pos(self):
+        def CooGet(para, margin = 0):
+            hwm = self.vehicle_w 
+            hlm = self.vehicle_l - self.vehicle_w 
+            x, y, theta = para
+            theta0 = math.degrees(math.atan(hwm/hlm))
+            dx1 = round(np.sqrt(hwm**2+hlm**2) * math.cos(math.radians((theta0+theta))),3)
+            dy1 = round(np.sqrt(hwm**2+hlm**2) * math.sin(math.radians((theta0+theta))),3)
+            dx2 = round(np.sqrt(hwm**2+hlm**2) * math.cos(math.radians((theta0-theta))),3)
+            dy2 = round(np.sqrt(hwm**2+hlm**2) * math.sin(math.radians((theta0-theta))),3)
+            Pa = (round(x-dx2,3),round(y-dy2,3))
+            Pb = (round(x-dx1,3),round(y+dy1,3))
+            Pc = (round(x+dx2,3),round(y+dy2,3))
+            Pd = (round(x+dx1,3),round(y-dy1,3))
+            return [Pa, Pb, Pc, Pd]            
+        [Pa, Pb, Pc, Pd] = CooGet([self.x_in_pixel, self.y_in_pixel, self.rotation_degree])
+        shape_points = [(Pa,Pb),(Pb,Pc),(Pc,Pd),(Pd,Pa)]
+        if self.last_in_pixel[0] < 0:
+            self.shape = shape_points
+        else:
+            shape_line = {}
+            for line in shape_points:
+                shape_line[line] = np.hypot(line[0][0]-self.last_in_pixel[0], line[0][1]-self.last_in_pixel[1]) + \
+                                   np.hypot(line[1][0]-self.last_in_pixel[0], line[1][1]-self.last_in_pixel[1])
+            forward_shape_line = max(shape_line.items(), key = lambda x: x[1])[0]
+            for i in range(len(shape_points)):
+                if shape_points[i] == forward_shape_line:
+                    # mid point in forward line
+                    mid_point = ((forward_shape_line[0][0] + forward_shape_line[1][0])/2, 
+                                (forward_shape_line[0][1] + forward_shape_line[1][1])/2)
+                    forward_point = (2*mid_point[0] - self.x_in_pixel, 2*mid_point[1] - self.y_in_pixel)
+                    break
+            shape_points = shape_points[0:i] + [(forward_shape_line[0],forward_point),(forward_point,forward_shape_line[1])] + shape_points[i+1:]
+            self.shape = shape_points
+        return shape_points
 
 
 class World(object):
@@ -506,7 +559,7 @@ class World(object):
     def generate_vehicles(self):
         while(True):
             vehicle_class = 0
-            road_id = 7
+            road_id = random.randint(0,15)
             lane_number = 1
             if (lane_number < 0):
                 direction = 0
@@ -514,15 +567,32 @@ class World(object):
                 direction = 1
             pos_frenet = 0
             Vehicle(vehicle_class, road_id, direction, abs(lane_number), pos_frenet, self.map,
-                    self.vehicle_simulation, self.map_image._pixels_per_meter, self.map_image._world_offset)
-            # time.sleep(3)
+                    self.vehicle_simulation, self.map_image._pixels_per_meter, self.map_image._world_offset)  
+            #    time.sleep(1)
             break
+def point2point(ego_ps, other_ps):
+    ps_1 = [it[0] for it in ego_ps]
+    ps_2 = [it[0] for it in other_ps]
+    for p1 in ps_1:
+        for p2 in ps_2:
+            if np.hypot(p1[0]-p2[0], p1[1]-p2[1]) < 100:
+                return True
+    return False
+
+
+def is_collide(ego, all):
+    for car in all:
+        if ego != car:
+            if np.hypot(ego.x_in_pixel-car.x_in_pixel, ego.y_in_pixel-car.y_in_pixel) < 100:
+                if point2point(ego.get_shape_pos(), car.get_shape_pos()):
+                    return True
+    return False
 
 def game_loop():
     """Initialized, Starts and runs all the needed modules for No Rendering Mode"""
     # initialize pygame
     pygame.init()
-    vehicle_simulation = pygame.sprite.Group()
+    vehicle_simulation = set()
     screen_width = 1220
     display = pygame.display.set_mode((screen_width, screen_width))
     pygame.display.set_caption("SIMULATION")
@@ -533,22 +603,44 @@ def game_loop():
     # start each module
     world.start()
 
-    thread1 = threading.Thread(name="generate_vehicles", target=world.generate_vehicles(), args=())
-    thread1.daemon = True
-    thread1.start()
-    # world.generate_vehicles()
+    # thread1 = threading.Thread(name="generate_vehicles", target = world.generate_vehicles(), args=())
+    # thread1.daemon = True
+    # thread1.start()
+    world.generate_vehicles()    
+    current_time = time.perf_counter()
+    cnt = 0
     while (True):
+        if time.perf_counter() - current_time > 1 and cnt < 50:
+            current_time = time.perf_counter()
+            print(time.perf_counter() )
+            world.generate_vehicles()    
+            cnt += 1
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 sys.exit()
         world.map_image.surface.blit(world.map_image.big_map_surface, (0,0))
         for vehicle in vehicle_simulation:
-            vehicle.move()
-            world.map_image.surface.blit(vehicle.image, [vehicle.x_in_pixel, vehicle.y_in_pixel])
-
+            record_state = vehicle.record()
+            high_speed = random.randint(3,5)
+            for speed in range(high_speed,-1,-1):                
+                vehicle.move(speed)
+                if is_collide(vehicle, vehicle_simulation):     
+                    print("risk")
+                    vehicle.back2record(record_state)
+                else:          
+                    if is_collide(vehicle, vehicle_simulation):     
+                        pdb.set_trace()
+                    for line in vehicle.get_shape_pos():         
+                        if speed == high_speed:
+                            color = car_color_set[2]       
+                        else:
+                            color = car_color_set[0]       
+                        pygame.draw.line(world.map_image.surface,color,line[0],line[1],30)     
+                    break
         display.blit(pygame.transform.scale(world.map_image.surface,
                                             display.get_rect().size), (0, 0))
         pygame.display.update()
+        time.sleep(0.05)            
 
 def main():
     game_loop()
