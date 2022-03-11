@@ -5,7 +5,7 @@ from pickle import TRUE
 import random
 import sys, pdb
 import copy
-from scipy import rand
+from pygame.locals import *
 
 from sympy import false
 
@@ -284,6 +284,7 @@ class Vehicle():
         self.shape = []
         
         self.road_id = road_id
+        # lane number: it represents the number of lane toward to centerline
         self.lane = lane
         # 1 means the left lane in current road, 0 means the right lane in current road
         self.direction = direction
@@ -309,12 +310,18 @@ class Vehicle():
             # it needs to check the direction of the current road, it is determined by the contact point of the connecting road
             junction_index = self.map._road_id_to_junction_index[self.road_id]
             connection = self.map.junctions[junction_index[0]].connections[junction_index[1]]
+            # the direction of vehicle is the same with the junction curve
             if connection.contactPoint == "start":
                 self.pos_frenet += self.speed
+                # if vehicle has arrived at the end of the junction, then the vehicle runs into a new road
                 if self.pos_frenet > self.map.roads[self.map._road_id_to_index[connection.connectingRoad]].length:
+                    # the remain frenet in the new road
                     pos_frenet_temp = self.pos_frenet - self.map.roads[self.map._road_id_to_index[connection.connectingRoad]].length
+                    # determine the new road
                     item_leavingRoad = self.map.roads[self.map._road_id_to_index[connection.leavingRoad]]
+                    # update the road id of the new road
                     self.road_id = connection.leavingRoad
+                    # if the direction of vehicle is the same with the junction curve, then determine the frenet, direction
                     if connection.contactPointOnLeavingRoad == "start":
                         self.pos_frenet = pos_frenet_temp
                         self.direction = 0
@@ -323,12 +330,17 @@ class Vehicle():
                         self.pos_frenet = item_leavingRoad.length - pos_frenet_temp
                         self.direction = 1
                         self.lane = 1
+            # the direction of vehicle is the different from the junction curve
             elif connection.contactPoint == "end":
                 self.pos_frenet -= self.speed
+                # if vehicle has arrived at the end of the junction, then the vehicle runs into a new road
                 if self.pos_frenet < 0:
+                    # the remain frenet in the new road
                     pos_frenet_temp = -self.pos_frenet
+                    # determine the new road
                     item_leavingRoad = self.map.roads[self.map._road_id_to_index[connection.leavingRoad]]
                     self.road_id = connection.leavingRoad
+                    # if the direction of vehicle is the same with the junction curve, then determine the frenet, direction 
                     if connection.contactPointOnLeavingRoad == "start":
                         self.pos_frenet = pos_frenet_temp
                         self.direction = 0
@@ -337,7 +349,7 @@ class Vehicle():
                         self.pos_frenet = item_leavingRoad.length - pos_frenet_temp
                         self.direction = 1
                         self.lane = 1
-        else:
+        else: # drive on the road segment
             # drive along the positive position of the road
             if (self.direction == 0):
                 self.pos_frenet += self.speed
@@ -351,7 +363,7 @@ class Vehicle():
                         connection_available = []
                         for connection in junction.connections:
                             if connection.incomingRoad == road.id:
-                                connection_available.append(connection)
+                                connection_available.append(connection) 
                         connection_chosen = random.choice(connection_available)
                         connectingRoad = connection_chosen.connectingRoad
                         contactPoint = connection_chosen.contactPoint
@@ -462,7 +474,7 @@ class Vehicle():
             self.rotation_degree = math.degrees(hdg) % 360
 
         # get position in pixel
-        if self.last_in_pixel[0] != self.x_in_pixel and self.last_in_pixel[1] != self.y_in_pixel:
+        if self.last_in_pixel[0] != self.x_in_pixel or self.last_in_pixel[1] != self.y_in_pixel:
             self.last_in_pixel = [self.x_in_pixel, self.y_in_pixel]
         self.x_in_pixel, self.y_in_pixel = self.pos_in_pixel()
         
@@ -550,6 +562,7 @@ class World(object):
         DATA_PATH = os.path.normpath(os.path.join(_ME_PATH, '../data/xml'))
         filename = "Town01.xodr"
         filepath = os.path.join(DATA_PATH, filename)
+        # get road network info
         with open(filepath, 'r') as f:
             parser = etree.XMLParser()
             rootNode = etree.parse(f, parser).getroot()
@@ -559,7 +572,7 @@ class World(object):
     def generate_vehicles(self):
         while(True):
             vehicle_class = 0
-            road_id = random.randint(0,15)
+            road_id = 0
             lane_number = 1
             if (lane_number < 0):
                 direction = 0
@@ -575,7 +588,7 @@ def point2point(ego_ps, other_ps):
     ps_2 = [it[0] for it in other_ps]
     for p1 in ps_1:
         for p2 in ps_2:
-            if np.hypot(p1[0]-p2[0], p1[1]-p2[1]) < 100:
+            if np.hypot(p1[0]-p2[0], p1[1]-p2[1]) < 50:
                 return True
     return False
 
@@ -583,7 +596,7 @@ def point2point(ego_ps, other_ps):
 def is_collide(ego, all):
     for car in all:
         if ego != car:
-            if np.hypot(ego.x_in_pixel-car.x_in_pixel, ego.y_in_pixel-car.y_in_pixel) < 100:
+            if np.hypot(ego.x_in_pixel-car.x_in_pixel, ego.y_in_pixel-car.y_in_pixel) < 200:
                 if point2point(ego.get_shape_pos(), car.get_shape_pos()):
                     return True
     return False
@@ -608,39 +621,53 @@ def game_loop():
     # thread1.start()
     world.generate_vehicles()    
     current_time = time.perf_counter()
+    pause = True
     cnt = 0
     while (True):
-        if time.perf_counter() - current_time > 1 and cnt < 50:
-            current_time = time.perf_counter()
-            print(time.perf_counter() )
-            world.generate_vehicles()    
-            cnt += 1
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 sys.exit()
-        world.map_image.surface.blit(world.map_image.big_map_surface, (0,0))
-        for vehicle in vehicle_simulation:
-            record_state = vehicle.record()
-            high_speed = random.randint(3,5)
-            for speed in range(high_speed,-1,-1):                
-                vehicle.move(speed)
-                if is_collide(vehicle, vehicle_simulation):     
-                    print("risk")
-                    vehicle.back2record(record_state)
-                else:          
+            # pause or continue the loop by click the MOUSE
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                pause = bool(1-pause)
+        if (pause):
+            if time.perf_counter() - current_time > 3 and cnt < 30:
+                current_time = time.perf_counter()
+                print(time.perf_counter() )
+                world.generate_vehicles()    
+                cnt += 1
+            world.map_image.surface.blit(world.map_image.big_map_surface, (0,0))
+            for vehicle in vehicle_simulation:
+                record_state = vehicle.record()
+                high_speed = random.randint(3,5)
+                for speed in range(high_speed,-1,-1):                
+                    vehicle.move(speed)
                     if is_collide(vehicle, vehicle_simulation):     
-                        pdb.set_trace()
-                    for line in vehicle.get_shape_pos():         
-                        if speed == high_speed:
-                            color = car_color_set[2]       
-                        else:
-                            color = car_color_set[0]       
-                        pygame.draw.line(world.map_image.surface,color,line[0],line[1],30)     
-                    break
-        display.blit(pygame.transform.scale(world.map_image.surface,
-                                            display.get_rect().size), (0, 0))
-        pygame.display.update()
-        time.sleep(0.05)            
+                        print("risk")
+                        vehicle.back2record(record_state)
+                    else:          
+                        if is_collide(vehicle, vehicle_simulation):     
+                            pdb.set_trace()
+                        for line in vehicle.get_shape_pos():         
+                            if speed == high_speed:
+                                color = car_color_set[2]       
+                            else:
+                                color = car_color_set[0]       
+                            pygame.draw.line(world.map_image.surface,color,line[0],line[1],30)     
+                        break
+            pop_list = []
+            for vehicle in vehicle_simulation:
+                if vehicle.road_id == 10:
+                    pop_list.append(vehicle)   
+            for vehicle in pop_list:    
+                vehicle_simulation.remove(vehicle)
+                cnt -= 1
+                         
+
+            display.blit(pygame.transform.scale(world.map_image.surface,
+                                                display.get_rect().size), (0, 0))
+            pygame.display.update()
+            time.sleep(0.05)            
 
 def main():
     game_loop()
