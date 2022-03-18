@@ -236,7 +236,10 @@ class Vehicle(object):
         self.get_position()
         self.get_shape_pos()     
 
-    def get_position(self):
+    def get_position(self):       
+        if self.last_state[0] != self.x or self.last_state[1] != self.y:
+            self.last_state = [self.x, self.y]
+            
         s_pos = self.pos_frenet
         # pdb.set_trace()
         geometries = self.map.roads[self.map._road_id_to_index[self.road_id]].planView.geometries
@@ -252,7 +255,7 @@ class Vehicle(object):
         self.x, self.y = pos[0], pos[1]
         # Returns the lateral vector based on forward vector
         self.leftVector.x, self.leftVector.y = np.cos(hdg), np.sin(hdg)
-        self.leftVector.rotation2D(np.pi / 2)
+        self.leftVector.rotation2D(-np.pi / 2)
 
         if self.direction > 0:
             self.x, self.y = pos[0] - self.leftVector.x * self.lane * 2, pos[1] - self.leftVector.y * self.lane * 2
@@ -260,9 +263,6 @@ class Vehicle(object):
         else:
             self.x, self.y = pos[0] + self.leftVector.x * self.lane * 2, pos[1] + self.leftVector.y * self.lane * 2
             self.rotation_degree = math.degrees(hdg) % 360
-        
-        if self.last_state[0] != self.x or self.last_state[1] != self.y:
-            self.last_state = [self.x, self.y]
         
     def get_shape_pos(self):
         def CooGet(para, margin = 0):
@@ -274,11 +274,11 @@ class Vehicle(object):
             dy1 = round(np.sqrt(hwm**2+hlm**2) * math.sin(math.radians((theta0+theta))),3)
             dx2 = round(np.sqrt(hwm**2+hlm**2) * math.cos(math.radians((theta0-theta))),3)
             dy2 = round(np.sqrt(hwm**2+hlm**2) * math.sin(math.radians((theta0-theta))),3)
-            Pa = (round(x-dx2,3),round(y-dy2,3))
-            Pb = (round(x-dx1,3),round(y+dy1,3))
-            Pc = (round(x+dx2,3),round(y+dy2,3))
-            Pd = (round(x+dx1,3),round(y-dy1,3))
-            return [Pa, Pb, Pc, Pd]            
+            Pa = (round(x-dx2,3),round(y+dy2,3))
+            Pb = (round(x-dx1,3),round(y-dy1,3))
+            Pc = (round(x+dx2,3),round(y-dy2,3))
+            Pd = (round(x+dx1,3),round(y+dy1,3)) 
+            return [Pa, Pb, Pc, Pd]    
         [Pa, Pb, Pc, Pd] = CooGet([self.x, self.y, self.rotation_degree])
         shape_points = [(Pa,Pb),(Pb,Pc),(Pc,Pd),(Pd,Pa)]
         if self.last_state[0] < 0:
@@ -430,10 +430,10 @@ class WorldImage(object):
     
     def draw_vehicle(self, t):
         for vehicle_id in self.world.vehicle_record[t]:
-            shape = self.world.vehicle_record[t][vehicle_id]
-            for line in shape:         
+            shape = self.world.vehicle_record[t][vehicle_id]   
+            for line in shape:   
                 line_in_pixel = (self.world_to_pixel(line[0]), self.world_to_pixel(line[1])) 
-                pygame.draw.line(self.surface,car_color_set[2],line_in_pixel[0],line_in_pixel[1],30)     
+                pygame.draw.line(self.surface,car_color_set[2],line_in_pixel[0],line_in_pixel[1],30)
 
 class World(object):
     """
@@ -526,14 +526,14 @@ class World(object):
 
             display.blit(pygame.transform.scale(world_image.surface,display.get_rect().size), (0, 0))
             pygame.display.update()
-            time.sleep(0.1)    
+            time.sleep(0.05)    
 
 def simulation():
     run_time = 1000            # running time for simulation
     world = World(run_time)
     world.load_map()          # init network
     world.generate_flow()     # init flow
-    world.action()
+    world.action()            # vehicle control
     world.visulizer()         # visulization
 
 def main():
