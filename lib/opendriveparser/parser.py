@@ -23,17 +23,6 @@ def parse_opendrive(rootNode):
 
     newOpenDrive = OpenDrive()
 
-    # Header
-    header = rootNode.find("header")
-
-    if header is not None:
-
-        # Reference
-        if header.find("geoReference") is not None:
-            newHeader = Header()
-
-        newOpenDrive.header = newHeader
-
     # Junctions
     for junction in rootNode.findall("junction"):
 
@@ -62,7 +51,7 @@ def parse_opendrive(rootNode):
 
             newJunction.addConnection(newConnection)
 
-        newOpenDrive.junctions.append(newJunction)
+        newOpenDrive.junctions[int(junction.get("id"))] = newJunction
 
 
 
@@ -358,6 +347,7 @@ def parse_opendrive(rootNode):
                     width.length = widthsLengths[widthIdx]
 
 
-        newOpenDrive.roads.append(newRoad)
+        newOpenDrive.roads[newRoad.id] = newRoad
 
     return newOpenDrive
+
