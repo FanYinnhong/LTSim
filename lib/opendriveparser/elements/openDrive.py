@@ -3,11 +3,9 @@ class OpenDrive(object):
 
     def __init__(self):
         self._header = None
-        self._roads = []
-        self._controllers = []
-        self._junctions = []
+        self._roads = {}
+        self._junctions = {}
         self._junctionGroups = []
-        self._stations = []
 
     @property
     def header(self):
@@ -31,9 +29,6 @@ class OpenDrive(object):
 
         return None
 
-    @property
-    def controllers(self):
-        return self._controllers
 
     @property
     def junctions(self):
@@ -43,9 +38,6 @@ class OpenDrive(object):
     def junctionGroups(self):
         return self._junctionGroups
 
-    @property
-    def stations(self):
-        return self._stations
 
 
 class Header(object):
