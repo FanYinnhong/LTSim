@@ -37,11 +37,8 @@ COLOR_ALUMINIUM_4_5 = pygame.Color(66, 62, 64)
 COLOR_ALUMINIUM_5 = pygame.Color(46, 52, 54)
 
 
-COLOR_GREEN_CAR = pygame.Color(139, 209, 81)
-COLOR_YELLOW_CAR = pygame.Color(255, 243, 0)
-COLOR_RED_CAR = pygame.Color(239, 41, 41)
-
-car_color_set = [COLOR_RED_CAR, COLOR_YELLOW_CAR, COLOR_GREEN_CAR]
-
 COLOR_WHITE = pygame.Color(255, 255, 255)
 COLOR_BLACK = pygame.Color(0, 0, 0)
+
+COLOR_ACTIVE = pygame.Color('dodgerblue1')
+COLOR_INACTIVE = pygame.Color('dodgerblue4')
