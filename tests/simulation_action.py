@@ -545,7 +545,7 @@ class World(object):
 
 
 def simulation():
-    run_time = 1000  # running time for simulation
+    run_time = 300  # running time for simulation
     world = World(run_time)
     input_control = InputContrl()
     world.load_map()  # init network
