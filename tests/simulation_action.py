@@ -278,6 +278,21 @@ class World(object):
                 self.tls[(junction_id, incomingRoad)] = TrafficLight(get_init_pos(incomingRoad, junction_id), st, gt, yt, rt, direction_group)
                 st += (gt + yt)
 
+    def nearest_car(self, d_x, d_y):
+        vehicle_id_chosen = (-100, -100, -100)
+        dis = None
+        for vehicle_id in self.vehicle_record[self.clock_tick]:
+            v_x = self.vehicle_record[self.clock_tick][vehicle_id][0][0][0][0]
+            v_y = self.vehicle_record[self.clock_tick][vehicle_id][0][0][0][1]
+            temp = (d_x - v_x) ** 2 + (d_y - v_y) ** 2
+            if dis == None:
+                dis = temp
+                vehicle_id_chosen = vehicle_id
+            else:
+                if temp < dis:
+                    vehicle_id_chosen = vehicle_id
+        return vehicle_id_chosen
+
     def update_info(self):
         sum_velocity = 0
         self.veh_count = 0
@@ -296,7 +311,7 @@ class World(object):
                                                           road_count=len(self.map.roads),junc_count=len(self.map.junctions),
                                                           veh_count=self.veh_count, av_speed=self.average_speed)
         if road_id >= 0:
-            s += "\n\nRoad id: {road}.\n Predecessor: {pre}\n Successor: {suc}\n " \
+            s += "\n\n Road id: {road}.\n Predecessor: {pre}\n Successor: {suc}\n " \
                  "Length: {l}\n ".format(road=str(road_id),
                            pre=self.map.roads[road_id].link.predecessor.elementId,
                            suc=self.map.roads[road_id].link.successor.elementId,
@@ -305,7 +320,6 @@ class World(object):
         if (self.focus_on and self.info_junction_id >= 0):
             x, y = self.map.junctions[self.info_junction_id].pos_left_top
             coor = "(" + str(round(x, 2)) + ", " + str(round(y, 2)) + ")"
-            # print(coor)
             self.str_junction = "Junction id: {junc}.\n Left top coor:\n {lt_coor}.\n ".format(junc=self.info_junction_id,
                                                                                      lt_coor=coor)
         if (self.focus_on and len(self.str_junction) != 0):
@@ -376,6 +390,15 @@ class World(object):
             self.clock_tick = 0
             self.is_suspend = False
             suspend_button.reset_text('Suspend')
+            self.x_offset = 0
+            self.y_offset = 0
+            self.x_scale_offset = 0
+            self.y_scale_offset = 0
+            self.prev_scaled_size = screen_width
+            self.vehicle_id_chosen = (-100, -100, -100)
+            self.hero_mode = False
+            self.hero_mode_choose = False
+            input_control.wheel_offset = 1
         restart_button = Button(int(0.14 * screen_width), 0,
                                 int(0.1 * screen_width), int(0.05 * screen_width), 'Restart', restart)
         def restore():
@@ -385,6 +408,9 @@ class World(object):
             self.y_scale_offset = 0
             self.prev_scaled_size = screen_width
             input_control.wheel_offset = 1
+            self.vehicle_id_chosen = (-100, -100, -100)
+            self.hero_mode = False
+            self.hero_mode_choose = False
         restore_button = Button(int(0.26 * screen_width), 0,
                                 int(0.1 * screen_width), int(0.05 * screen_width), 'Restore', restore)
         def focus():
@@ -397,6 +423,27 @@ class World(object):
             self.movable = not self.movable
         movable_button = Button(int(0.38 * screen_width), 0,
                                 int(0.1 * screen_width), int(0.05 * screen_width), 'Movable', whether_movable)
+
+        self.vehicle_id_chosen = (-100, -100, -100)
+        self.hero_mode_choose = False
+        def hero_choose():
+            if self.hero_mode:
+                self.hero_mode_choose = False
+            else:
+                self.hero_mode_choose = not self.hero_mode_choose
+            self.hero_mode = False
+            if not self.hero_mode_choose:
+                self.vehicle_id_chosen = (-100, -100, -100)
+        hero_button = Button(int(0.5 * screen_width), 0,
+                             int(0.15 * screen_width), int(0.05 * screen_width), 'Hero Mode', hero_choose)
+        self.hero_mode = False
+        def hero_car():
+            hero_car_button.button_rect = pygame.Rect(-200, -100, int(0.2 * screen_width),
+                                                      int(0.05 * screen_width))
+            self.hero_mode = True
+            self.hero_mode_choose = False
+        hero_car_button = Button(-200, -100, int(0.2 * screen_width), int(0.05 * screen_width),
+                                 'Choose car', hero_car)
 
         while (True):
             if self.run_time == self.clock_tick + 1:
@@ -428,9 +475,15 @@ class World(object):
                             self.focus_on = True
                         elif movable_button.button_rect.collidepoint(event.pos):
                             movable_button.callback()
+                        elif hero_button.button_rect.collidepoint(event.pos):
+                            hero_button.callback()
+                        elif hero_car_button.button_rect.collidepoint(event.pos):
+                            hero_car_button.callback()
                         else:
                             # make sure the menu list is not shown on the screen
                             focus_button.button_rect = pygame.Rect(-100, -100,
+                                                                   int(0.2 * screen_width), int(0.05 * screen_width))
+                            hero_car_button.button_rect = pygame.Rect(-200, -100,
                                                                    int(0.2 * screen_width), int(0.05 * screen_width))
                             if self.movable:
                                 self.dragged = True
@@ -439,11 +492,18 @@ class World(object):
                         self.cursor_x, self.cursor_y = pygame.mouse.get_pos()
                         d_x, d_y = world_image.cursor_to_world(int((self.x_scale_offset + self.x_offset + self.cursor_x) * world_image._width_in_pixels / self.scaled_size),
                                                                int((self.y_scale_offset + self.y_offset + self.cursor_y) * world_image._width_in_pixels / self.scaled_size))
-                        d_road_id = self.map.collision_check(d_x, d_y)
-                        if d_road_id in self.map._road_id_to_junction_id.keys():
-                            right_click_junction_id = self.map._road_id_to_junction_id[d_road_id][0]
-                            focus_button.button_rect = pygame.Rect(self.cursor_x, self.cursor_y,
-                                                                   int(0.2 * screen_width), int(0.05 * screen_width))
+                        if not self.hero_mode_choose:
+                            d_road_id = self.map.collision_check(d_x, d_y)
+                            if d_road_id in self.map._road_id_to_junction_id.keys():
+                                right_click_junction_id = self.map._road_id_to_junction_id[d_road_id][0]
+                                focus_button.button_rect = pygame.Rect(self.cursor_x, self.cursor_y,
+                                                                       int(0.2 * screen_width), int(0.05 * screen_width))
+                        else:
+                            self.vehicle_id_chosen = self.nearest_car(d_x, d_y)
+                            if self.vehicle_id_chosen != (-100, -100, -100):
+                                hero_car_button.button_rect = pygame.Rect(self.cursor_x, self.cursor_y,
+                                                              int(0.2 * screen_width), int(0.05 * screen_width))
+
                     input_control._parse_zoom(event.button)
 
                 elif event.type == pygame.MOUSEMOTION:
@@ -494,6 +554,21 @@ class World(object):
                 self.info_junction_id = right_click_junction_id
                 right_click_junction_id = -1
 
+            if self.hero_mode and self.vehicle_id_chosen != (-100, -100, -100):
+                # the horizon of the hero mode is 100 x 100m
+                input_control.wheel_offset = 1 / (self.map._world_width / 100)
+                self.scaled_size = int(screen_width / input_control.wheel_offset)
+                self.prev_scaled_size = self.scaled_size
+                self.y_scale_offset = 0
+                self.x_scale_offset = 0
+                x_car = self.vehicle_record[self.clock_tick][self.vehicle_id_chosen][0][0][0][0]
+                y_car = self.vehicle_record[self.clock_tick][self.vehicle_id_chosen][0][0][0][1]
+                x_car -= 50
+                y_car += 50
+                x_car, y_car = world_image.world_to_pixel([x_car, y_car])
+                self.x_offset = int(x_car / world_image._width_in_pixels * self.scaled_size)
+                self.y_offset = int(y_car / world_image._width_in_pixels * self.scaled_size)
+
             self.scaled_size = int(screen_width / input_control.wheel_offset)
             px = (screen_width/2 + self.x_scale_offset + self.x_offset) / float(self.prev_scaled_size)
             py = (screen_width/2 + self.y_scale_offset + self.y_offset) / float(self.prev_scaled_size)
@@ -523,7 +598,6 @@ class World(object):
                 self.draw_rect_alpha(display, (160, 160, 160, 127),
                                      (0, int(0.85 * screen_width), screen_width, int(0.15 * screen_width)))
 
-
             display.blit(self.text.surface, self.text.pos)
             pygame.draw.rect(display, COLOR_INACTIVE, pygame.Rect(0, 0, 1.3 * screen_width, int(0.05 * screen_width)))
             # timer for implementing suspend function
@@ -531,13 +605,19 @@ class World(object):
             suspend_button.draw(display)
             restore_button.draw(display)
             focus_button.draw(display)
+            hero_car_button.draw(display)
             if self.movable:
                 movable_button.color = COLOR_ACTIVE
             else:
                 movable_button.color = COLOR_INACTIVE
+            if self.hero_mode_choose or self.hero_mode:
+                hero_button.color = COLOR_ACTIVE
+            else:
+                hero_button.color = COLOR_INACTIVE
             movable_button.draw(display)
+            hero_button.draw(display)
 
-            if not self.is_suspend:
+            if not self.is_suspend and not self.hero_mode_choose:
                 self.clock_tick += 1
 
             pygame.display.update()
@@ -545,7 +625,7 @@ class World(object):
 
 
 def simulation():
-    run_time = 300  # running time for simulation
+    run_time = 130  # running time for simulation
     world = World(run_time)
     input_control = InputContrl()
     world.load_map()  # init network
