@@ -496,7 +496,8 @@ class World(object):
                                                                    int(0.2 * screen_width), int(0.05 * screen_width))
                             hero_car_button.button_rect = pygame.Rect(-200, -100,
                                                                    int(0.2 * screen_width), int(0.05 * screen_width))
-                            self.vehicle_id_chosen = (-100, -100, -100)
+                            if (not self.hero_mode):
+                                self.vehicle_id_chosen = (-100, -100, -100)
                             if self.movable:
                                 self.dragged = True
                                 self.mouse_x, self.mouse_y = event.pos
@@ -552,7 +553,7 @@ class World(object):
             world_image.surface.blit(world_image.big_map_surface, (0, 0))
             world_image.draw_traffic_light(self.clock_tick)
             world_image.draw_vehicle(self.clock_tick)
-            if self.hero_mode_choose and self.vehicle_id_chosen != (-100, -100, -100):
+            if (self.hero_mode_choose or self.hero_mode) and self.vehicle_id_chosen != (-100, -100, -100):
                 world_image.draw_chosen_vehicle(self.clock_tick, self.vehicle_id_chosen)
             self.update_info()
 
