@@ -291,12 +291,14 @@ class World(object):
         vehicle_id_chosen = (-100, -100, -100)
         dis = None
         for vehicle_id in self.vehicle_record[self.clock_tick]:
-            v_x = self.vehicle_record[self.clock_tick][vehicle_id][0][0][0][0]
-            v_y = self.vehicle_record[self.clock_tick][vehicle_id][0][0][0][1]
+            v_x = self.vehicle_record[self.clock_tick][vehicle_id][0][0][0][0] + self.map._world_offset[0]
+            v_y = self.vehicle_record[self.clock_tick][vehicle_id][0][0][0][1] + self.map._world_offset[1]
+            # print("car_x", v_x, "car_y", v_y)
             temp = (d_x - v_x) ** 2 + (d_y - v_y) ** 2
             if dis == None:
-                dis = temp
-                vehicle_id_chosen = vehicle_id
+                if temp <= 1250:
+                    dis = temp
+                    vehicle_id_chosen = vehicle_id
             else:
                 if temp < dis:
                     vehicle_id_chosen = vehicle_id
@@ -494,13 +496,17 @@ class World(object):
                                                                    int(0.2 * screen_width), int(0.05 * screen_width))
                             hero_car_button.button_rect = pygame.Rect(-200, -100,
                                                                    int(0.2 * screen_width), int(0.05 * screen_width))
+                            self.vehicle_id_chosen = (-100, -100, -100)
                             if self.movable:
                                 self.dragged = True
                                 self.mouse_x, self.mouse_y = event.pos
                     if event.button == 3:
                         self.cursor_x, self.cursor_y = pygame.mouse.get_pos()
-                        d_x, d_y = world_image.cursor_to_world(int((self.x_scale_offset + self.x_offset + self.cursor_x) * world_image._width_in_pixels / self.scaled_size),
-                                                               int((self.y_scale_offset + self.y_offset + self.cursor_y) * world_image._width_in_pixels / self.scaled_size))
+                        d_x, d_y = world_image.cursor_to_world(
+                            int((self.x_scale_offset + self.x_offset + self.cursor_x)
+                                * world_image._width_in_pixels / self.scaled_size),
+                            int((self.y_scale_offset + self.y_offset + self.cursor_y)
+                                * world_image._width_in_pixels / self.scaled_size))
                         if not self.hero_mode_choose:
                             d_road_id = self.map.collision_check(d_x, d_y)
                             if d_road_id in self.map._road_id_to_junction_id.keys():
@@ -509,6 +515,7 @@ class World(object):
                                                                        int(0.2 * screen_width), int(0.05 * screen_width))
                         else:
                             self.vehicle_id_chosen = self.nearest_car(d_x, d_y)
+                            # print(d_x,d_y)
                             if self.vehicle_id_chosen != (-100, -100, -100):
                                 hero_car_button.button_rect = pygame.Rect(self.cursor_x, self.cursor_y,
                                                               int(0.2 * screen_width), int(0.05 * screen_width))
@@ -545,6 +552,8 @@ class World(object):
             world_image.surface.blit(world_image.big_map_surface, (0, 0))
             world_image.draw_traffic_light(self.clock_tick)
             world_image.draw_vehicle(self.clock_tick)
+            if self.hero_mode_choose and self.vehicle_id_chosen != (-100, -100, -100):
+                world_image.draw_chosen_vehicle(self.clock_tick, self.vehicle_id_chosen)
             self.update_info()
 
             if right_click_junction_id >= 0 and self.focus_on:

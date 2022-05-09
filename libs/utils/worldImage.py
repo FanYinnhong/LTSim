@@ -228,6 +228,18 @@ class WorldImage(object):
                 color = car_color_set[min(i // 5, 2)]
                 pygame.draw.circle(self.surface, color, self.world_to_pixel(vehicle_point), 10, 10)
 
+    def draw_chosen_vehicle(self, t, vehicle_id):
+        shape = self.world.vehicle_record[t][vehicle_id][0]
+        shape_in_pixel = []
+        for line in shape:
+            line_in_pixel = (self.world_to_pixel(line[0]), self.world_to_pixel(line[1]))
+            for point in line_in_pixel:
+                if point not in shape_in_pixel:
+                    shape_in_pixel.append(point)
+
+        color = car_color_set[0]
+        pygame.draw.polygon(self.surface, color, shape_in_pixel, 0)
+
     def draw_traffic_light(self, t):
         for index in self.world.tl_record[t]:
             pos = []
