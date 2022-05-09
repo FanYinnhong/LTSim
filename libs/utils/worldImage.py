@@ -1,6 +1,7 @@
 import numpy as np
 import os, sys
 from ..geom.Vector3D import Vector3D
+from ..geom.Point import Point
 import pygame
 
 COLOR_SCARLET_RED_0 = pygame.Color(239, 41, 41)
@@ -110,11 +111,24 @@ class WorldImage(object):
         def draw_broken_line(surface, color, closed, points, width):
             """Draws broken lines in a surface given a set of points, width and color"""
             # Select which lines are going to be rendered from the set of lines
-            broken_lines = [x for n, x in enumerate(zip(*(iter(points),) * 20)) if n % 3 == 0]
+            broken_lines = [x for n, x in enumerate(zip(*(iter(points),) * 40)) if n % 2 == 0]
 
             # Draw selected lines
             for line in broken_lines:
                 pygame.draw.lines(surface, color, closed, line, width)
+
+        def draw_dashed_line(surface, color, start_pos, end_pos, width=8, dash_length=10):
+            """Draws dashed line for liane geometry given start and end points"""
+            origin = Point(start_pos)
+            target = Point(end_pos)
+            displacement = target - origin
+            length = len(displacement)
+            slope = displacement / length
+
+            for index in range(0, int(length / dash_length), 2):
+                start = origin + (slope * index * dash_length)
+                end = origin + (slope * (index + 1) * dash_length)
+                pygame.draw.line(surface, color, start.get(), end.get(), width)
 
         for road in self.world.map.roads.values():
             geometries = road.planView.geometries
@@ -205,8 +219,43 @@ class WorldImage(object):
                     right_center_line.tolist()
                     left_center_line = [self.world_to_pixel(x) for x in left_center_line]
                     right_center_line = [self.world_to_pixel(x) for x in right_center_line]
-                    draw_solid_line(surface, COLOR_ORANGE_0, False, left_center_line, 8)
-                    draw_solid_line(surface, COLOR_ORANGE_0, False, right_center_line, 8)
+                    draw_solid_line(surface, COLOR_ORANGE_0, False, left_center_line, int(0.3 * self._pixels_per_meter))
+                    draw_solid_line(surface, COLOR_ORANGE_0, False, right_center_line, int(0.3 * self._pixels_per_meter))
+
+                # draw dashed line
+                left_cnt = cnt_driving_left - 1
+                right_cnt = cnt_driving_right - 1
+                if (geometry.getGeoType() == 'Arc' and road.junction == None):
+                    while(left_cnt > 0):
+                        dashed_line_left = waypoints_np + wayppoints_directions_left_np * self.driving_width * left_cnt
+                        dashed_line_left.tolist()
+                        dashed_line_left = [self.world_to_pixel(x) for x in dashed_line_left]
+                        draw_broken_line(surface, COLOR_ALUMINIUM_2, False, dashed_line_left, int(0.3 * self._pixels_per_meter))
+                        left_cnt -= 1
+
+                    while(right_cnt > 0):
+                        dashed_line_right = waypoints_np - wayppoints_directions_left_np * self.driving_width * right_cnt
+                        dashed_line_right.tolist()
+                        dashed_line_right = [self.world_to_pixel(x) for x in dashed_line_right]
+                        draw_broken_line(surface, COLOR_ALUMINIUM_2, False, dashed_line_right, int(0.3 * self._pixels_per_meter))
+                        right_cnt -= 1
+                if (geometry.getGeoType() == 'Line' and road.junction == None):
+                    while(left_cnt > 0):
+                        # draw_dashed_line(surface, color, start_pos, end_pos, width=8, dash_length=10)
+                        dashed_line_left = waypoints_np + wayppoints_directions_left_np * self.driving_width * left_cnt
+                        dashed_line_left.tolist()
+                        dashed_line_left = [self.world_to_pixel(x) for x in dashed_line_left]
+                        draw_dashed_line(surface, COLOR_ALUMINIUM_2, dashed_line_left[0], dashed_line_left[-1],
+                                         int(0.3 * self._pixels_per_meter), int(2.2 * self._pixels_per_meter))
+                        left_cnt -= 1
+
+                    while(right_cnt > 0):
+                        dashed_line_right = waypoints_np - wayppoints_directions_left_np * self.driving_width * right_cnt
+                        dashed_line_right.tolist()
+                        dashed_line_right = [self.world_to_pixel(x) for x in dashed_line_right]
+                        draw_dashed_line(surface, COLOR_ALUMINIUM_2, dashed_line_right[0], dashed_line_right[-1],
+                                         int(0.3 * self._pixels_per_meter), int(2.2 * self._pixels_per_meter))
+                        right_cnt -= 1
 
     def draw_vehicle(self, t):
         for vehicle_id in self.world.vehicle_record[t]:
