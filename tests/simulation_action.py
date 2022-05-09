@@ -95,7 +95,7 @@ class World(object):
     simulation that is running on the server side
     """
 
-    def __init__(self, run_time):
+    def __init__(self, run_time, map_name):
         self.run_time = run_time
         # World data
         self.map = None
@@ -105,7 +105,7 @@ class World(object):
         self.tls = {}
         self.tl_record = {}
         self.tl_control_record = {}
-        self.map_name = None
+        self.map_name = map_name
 
     def load_map(self):
         "load map files and get infos"
@@ -114,7 +114,6 @@ class World(object):
             # read road network
             _ME_PATH = os.path.abspath(os.path.dirname(__file__))
             DATA_PATH = os.path.normpath(os.path.join(_ME_PATH, '../data/xml'))
-            self.map_name = "Town01_0428"
             filename = self.map_name
             filename += ".xodr"
             filepath = os.path.join(DATA_PATH, filename)
@@ -140,9 +139,19 @@ class World(object):
         for road in self.map.roads.values():
             start_point, _ = road.planView.calc(0)
             end_point, _ = road.planView.calc(road.length)
-            list_temp = [road.id, start_point[0], start_point[1], end_point[0], end_point[1], road.length,
-                         road.link.predecessor.elementId, road.link.predecessor.elementType,
-                         road.link.successor.elementId, road.link.successor.elementType]
+            list_temp = [road.id, start_point[0], start_point[1], end_point[0], end_point[1], road.length]
+            if (road.link.predecessor != None):
+                list_temp.append(road.link.predecessor.elementId)
+                list_temp.append(road.link.predecessor.elementType)
+            else:
+                list_temp.append("None")
+                list_temp.append("None")
+            if (road.link.successor != None):
+                list_temp.append(road.link.successor.elementId)
+                list_temp.append(road.link.successor.elementType)
+            else:
+                list_temp.append("None")
+                list_temp.append("None")
             road_list.append(list_temp)
         road_dataframe = pd.DataFrame(columns = road_column, data = road_list)
         road_dataframe.to_csv(filepath)
@@ -344,7 +353,7 @@ class World(object):
         screen_width = 700
         display = pygame.display.set_mode((screen_width * 1.3, screen_width))
         pygame.display.set_caption("SIMULATION")
-        world_image = WorldImage(self, display)
+        world_image = WorldImage(self, display, self.map_name)
         self.text = Text(pygame.font.Font(pygame.font.get_default_font(), 15),
                          (int(0.3*screen_width), int(0.95*screen_width)), (int(screen_width), int(0.05*screen_width)))
         self.str_junction = ''
@@ -625,8 +634,9 @@ class World(object):
 
 
 def simulation():
-    run_time = 130  # running time for simulation
-    world = World(run_time)
+    run_time = 200  # running time for simulation
+    map_name = "Town01_0428"
+    world = World(run_time, map_name)
     input_control = InputContrl()
     world.load_map()  # init network
     world.save_map()

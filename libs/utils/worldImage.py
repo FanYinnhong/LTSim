@@ -13,6 +13,7 @@ COLOR_ALUMINIUM_3 = pygame.Color(136, 138, 133)
 COLOR_ALUMINIUM_4 = pygame.Color(85, 87, 83)
 COLOR_ALUMINIUM_4_5 = pygame.Color(66, 62, 64)
 COLOR_ALUMINIUM_5 = pygame.Color(46, 52, 54)
+COLOR_ORANGE_0 = pygame.Color(252, 175, 62)
 
 COLOR_GREEN_CAR = pygame.Color(139, 209, 81)
 COLOR_YELLOW_CAR = pygame.Color(255, 243, 0)
@@ -21,7 +22,7 @@ car_color_set = [COLOR_RED_CAR, COLOR_YELLOW_CAR, COLOR_GREEN_CAR]
 
 class WorldImage(object):
 
-    def __init__(self, world, display):
+    def __init__(self, world, display, map_name):
 
         # read world info
         self.world = world
@@ -44,7 +45,8 @@ class WorldImage(object):
         _ME_PATH = os.path.abspath(os.path.join(os.getcwd(), ".."))
 
         DATA_PATH = os.path.normpath(os.path.join(_ME_PATH, './data/cache'))
-        filename = "Town01_0428.tga"
+        filename = map_name
+        filename += ".tga"
         filepath = str(os.path.join(DATA_PATH, filename))
         self.big_map_surface = pygame.Surface((self._width_in_pixels, self._width_in_pixels)).convert()
         # load a copy for drawing clean map image on screen
@@ -100,6 +102,20 @@ class WorldImage(object):
             if len(polygon) > 2:
                 pygame.draw.polygon(surface, color, polygon)
 
+        def draw_solid_line(surface, color, closed, points, width):
+            """Draws solid lines in a surface given a set of points, width and color"""
+            if len(points) >= 2:
+                pygame.draw.lines(surface, color, closed, points, width)
+
+        def draw_broken_line(surface, color, closed, points, width):
+            """Draws broken lines in a surface given a set of points, width and color"""
+            # Select which lines are going to be rendered from the set of lines
+            broken_lines = [x for n, x in enumerate(zip(*(iter(points),) * 20)) if n % 3 == 0]
+
+            # Draw selected lines
+            for line in broken_lines:
+                pygame.draw.lines(surface, color, closed, line, width)
+
         for road in self.world.map.roads.values():
             geometries = road.planView.geometries
             # draw lane of current geometry
@@ -114,17 +130,34 @@ class WorldImage(object):
                 scf = 0
                 waypoints = []
                 wayppoints_left_direction = []
-
-                while (geometry.getLength() > scf):
-                    # hdg is the forward vecot of the current point
-                    pos, hdg = geometry.calcPosition(scf)
+                if (geometry.getGeoType() == 'Arc'):
+                    while (geometry.getLength() > scf):
+                        # hdg is the forward vecot of the current point
+                        pos, hdg = geometry.calcPosition(scf)
+                        pos[0], pos[1] = pos[0] - self.world.map._world_offset[0], pos[1] - self.world.map._world_offset[1]
+                        # Returns the lateral vector based on forward vector
+                        self.leftVector.x, self.leftVector.y = np.cos(hdg), np.sin(hdg)
+                        self.leftVector.rotation2D(np.pi / 2)
+                        waypoints.append(pos)
+                        wayppoints_left_direction.append([self.leftVector.x, self.leftVector.y])
+                        scf += self.precision
+                else:
+                    # Assume other type only include Line
+                    # only start and end position are added
+                    pos, hdg = geometry.calcPosition(0)
                     pos[0], pos[1] = pos[0] - self.world.map._world_offset[0], pos[1] - self.world.map._world_offset[1]
-                    # Returns the lateral vector based on forward vector
                     self.leftVector.x, self.leftVector.y = np.cos(hdg), np.sin(hdg)
                     self.leftVector.rotation2D(np.pi / 2)
                     waypoints.append(pos)
                     wayppoints_left_direction.append([self.leftVector.x, self.leftVector.y])
-                    scf += self.precision
+
+                    pos, hdg = geometry.calcPosition(geometry.getLength())
+                    pos[0], pos[1] = pos[0] - self.world.map._world_offset[0], pos[1] - self.world.map._world_offset[1]
+                    self.leftVector.x, self.leftVector.y = np.cos(hdg), np.sin(hdg)
+                    self.leftVector.rotation2D(np.pi / 2)
+                    waypoints.append(pos)
+                    wayppoints_left_direction.append([self.leftVector.x, self.leftVector.y])
+
 
                 waypoints_np = np.asarray(waypoints)
                 wayppoints_directions_left_np = np.asarray(wayppoints_left_direction)
@@ -163,9 +196,17 @@ class WorldImage(object):
                 polygon = [self.world_to_pixel(x) for x in polygon]
                 if len(polygon) > 2:
                     pygame.draw.polygon(surface, COLOR_ALUMINIUM_5, polygon)
-                # draw waypoints
+
                 if (road.junction == None):
-                    draw_lane(surface, waypoints_np, wayppoints_directions_left_np, 0.5, COLOR_ALUMINIUM_2)
+                    # draw center line
+                    left_center_line = waypoints_np + wayppoints_directions_left_np * 0.25
+                    right_center_line = waypoints_np - wayppoints_directions_left_np * 0.25
+                    left_center_line.tolist()
+                    right_center_line.tolist()
+                    left_center_line = [self.world_to_pixel(x) for x in left_center_line]
+                    right_center_line = [self.world_to_pixel(x) for x in right_center_line]
+                    draw_solid_line(surface, COLOR_ORANGE_0, False, left_center_line, 8)
+                    draw_solid_line(surface, COLOR_ORANGE_0, False, right_center_line, 8)
 
     def draw_vehicle(self, t):
         for vehicle_id in self.world.vehicle_record[t]:
