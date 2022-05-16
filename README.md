@@ -31,3 +31,6 @@ The LTSim have light renders for the convenience of traffic research.
 - Adding display area for showing junction condition,  global traffic information, simulation time and etc.
 - Fixing bug during zooming and panning of visual interface.
 - Supporting information export of the current simulation.
+- Perceptiving surrounding vehicles by the recursive judgment of adjacent sections under the Frenet coordinate system.
+- Optimize the interactions among vehicles based on the risk perception.
+- Adding the constraint of signal time assignment system on vehicle movement within intersections.
